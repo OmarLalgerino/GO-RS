@@ -1,1 +1,30 @@
-​[object Object]
+{
+  "metadata": {
+    "processedAt": "2026-01-29T14:27:21.417Z",
+    "source": {
+      "rss": "https://nyaa.land/download/2070189.torrent",
+      "mal": null
+    },
+    "totalDownloadLinks": 0,
+    "availableQualities": []
+  },
+  "episode": {
+    "title": "[One Fansub] Jigokuraku - S02E03 [1080p WEB HEVC] [Sub. Español] | Hell's Paradise",
+    "link": "https://nyaa.land/download/2070189.torrent"
+  },
+  "anime": {
+    "title": "[One Fansub] Jigokuraku - S02E03 [1080p WEB HEVC] [Sub. Español] | Hell's Paradise",
+    "images": null
+  },
+  "downloadLinks": {
+    "720p": [],
+    "1080p": [],
+    "480p": [],
+    "4K": [],
+    "unknown": []
+  },
+  "downloadSummary": {
+    "totalLinks": 0,
+    "hasMultipleQualities": false
+  }
+}
