@@ -1,21 +1,24 @@
-name: Beast Updater
+name: Beast Turk Updater
 on:
   schedule:
-    - cron: '0 * * * *' # سيعمل كل ساعة
-  workflow_dispatch: # زر التشغيل اليدوي
+    - cron: '0 * * * *' # سيعمل كل ساعة لجلب حلقات جديدة
+  workflow_dispatch: # للتشغيل اليدوي وقتما تشاء
+
 jobs:
-  run_beast:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - run: pip install feedparser requests
-      - run: python the_beast.py
-      - run: |
-          git config --global user.name "Bot"
-          git config --global user.email "bot@github.com"
-          git add data.json
-          git commit -m "Update Data" || exit 0
-          git push
+
+      - name: Install Dependencies
+        run: |
+          pip install requests beautifulsoup4 cloudscraper
+
+      - name: Run The Beast
+        run: python the_beast.py
