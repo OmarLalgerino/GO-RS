@@ -1,88 +1,66 @@
 import cloudscraper
-from bs4 import BeautifulSoup
-import csv
 import re
+import csv
+from bs4 import BeautifulSoup
 
-# إعداد القناص لتجاوز الحماية البسيطة
-scraper = cloudscraper.create_scraper()
+# إعداد المتصفح الوهمي لتجاوز حماية المواقع
+scraper = cloudscraper.create_scraper(browser={'browser': 'chrome','platform': 'android','desktop': False})
 
-def get_video_links(page_url):
-    """سحب روابط الجودات من صفحة الحلقة في عرب سيد"""
+def sniper_others_links(page_url):
+    """هذه الدالة تدخل لصفحة المسلسل وتصطاد روابط السيرفرات التي رفعها غيرك"""
     links = {"1080p": "", "720p": "", "480p": ""}
     try:
-        res = scraper.get(page_url, timeout=10)
-        soup = BeautifulSoup(res.content, 'html.parser')
+        res = scraper.get(page_url, timeout=15)
+        html = res.text
         
-        # البحث في جميع الروابط الموجودة في الصفحة
-        all_a = soup.find_all('a', href=True)
-        for a in all_a:
-            href = a['href']
-            text = a.text.lower()
-            
-            # صيد روابط الفيديو المباشرة (mp4, mkv, m3u8)
-            if any(ext in href for ext in ['.mp4', '.mkv', '.m3u8']):
-                if "1080" in text or "1080" in href: 
-                    if not links["1080p"]: links["1080p"] = href
-                elif "720" in text or "720" in href: 
-                    if not links["720p"]: links["720p"] = href
-                elif "480" in text or "480" in href: 
-                    if not links["480p"]: links["480p"] = href
+        # البحث عن روابط السيرفرات الجاهزة (Uqload, Dood, Upstream)
+        dood = re.findall(r'https?://(?:doodstream\.com|dood\.to|dood\.so|dood\.li)/e/([a-z0-9]+)', html)
+        uqload = re.findall(r'https?://(?:uqload\.com|uqload\.co)/embed-([a-z0-9]+)', html)
+        upstream = re.findall(r'https?://(?:upstream\.to|upstream\.org)/embed-([a-z0-9]+)', html)
+
+        # تحويل الأكواد المكتشفة لروابط كاملة تعمل في تطبيقك أونلاين
+        if dood: links["1080p"] = f"https://dood.to/e/{dood[0]}"
+        if uqload: links["720p"] = f"https://uqload.com/embed-{uqload[0]}.html"
+        if upstream: links["480p"] = f"https://upstream.to/embed-{upstream[0]}.html"
         
-        # إذا لم يجد روابط مباشرة، يبحث عن رابط المشغل (Iframe)
-        if not links["720p"]:
-            iframe = soup.find('iframe', src=True)
-            if iframe:
-                src = iframe['src']
-                links["720p"] = src if src.startswith('http') else 'https:' + src
-                
         return links
     except:
         return links
 
 def update_database():
-    # الرابط الجديد الذي زودتني به (قسم المسلسلات التركية)
-    source_url = "https://asd.pics/home3/category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%aa%d8%b1%d9%83%d9%8a%d8%a9/"
+    # رابط الموقع الذي سنصطاد منه (يمكنك تغييره لأي موقع يعرض مسلسلات)
+    source_url = "https://wecima.show/category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%aa%d8%b1%d9%83%d9%8a%d8%a9/"
     db_file = 'database.csv'
     all_data = []
 
-    print(f"🚀 انطلاق الوحش نحو: {source_url}")
+    print(f"🚀 البدء في قنص روابط السيرفرات من: {source_url}")
     try:
         res = scraper.get(source_url)
-        soup = BeautifulSoup(res.content, 'html.parser')
-        
-        # في عرب سيد، المسلسلات تكون داخل div بـ class MovieBlock
-        items = soup.find_all('div', class_='MovieBlock')
+        soup = BeautifulSoup(res.text, 'html.parser')
+        items = soup.find_all('div', class_='GridItem')
 
-        if not items:
-            print("⚠️ لم يتم العثور على حلقات، قد يكون الكلاس قد تغير.")
-        
-        for item in items[:20]: # سحب آخر 20 حلقة
-            name_tag = item.find('h2')
-            link_tag = item.find('a', href=True)
+        for item in items[:15]: # سحب آخر 15 حلقة
+            name = item.find('strong').text.strip() if item.find('strong') else "حلقة جديدة"
+            link = item.find('a')['href']
             
-            if name_tag and link_tag:
-                name = name_tag.text.strip()
-                link = link_tag['href']
-                
-                print(f"📡 جاري قنص: {name}")
-                v_links = get_video_links(link)
-                
-                all_data.append({
-                    'name': name,
-                    'url_1080p': v_links['1080p'],
-                    'url_720p': v_links['720p'],
-                    'url_480p': v_links['480p']
-                })
+            print(f"📡 جاري فحص صفحة: {name}")
+            v_links = sniper_others_links(link)
+            
+            all_data.append({
+                'name': name,
+                'url_1080p': v_links['1080p'],
+                'url_720p': v_links['720p'],
+                'url_480p': v_links['480p']
+            })
 
-        # حفظ البيانات في الملف
+        # حفظ النتائج في ملف CSV
         with open(db_file, mode='w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=['name', 'url_1080p', 'url_720p', 'url_480p'])
             writer.writeheader()
             writer.writerows(all_data)
-        print(f"✅ مبروك! تم تحديث {len(all_data)} حلقة بنجاح.")
-        
+        print("✅ المهمة تمت! الملف جاهز الآن بالروابط.")
     except Exception as e:
-        print(f"❌ خطأ أثناء السحب: {e}")
+        print(f"❌ خطأ: {e}")
 
 if __name__ == "__main__":
     update_database()
