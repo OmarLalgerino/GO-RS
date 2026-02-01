@@ -2,7 +2,7 @@ name: Auto Update Channels
 on:
   workflow_dispatch: # للتشغيل اليدوي من زر Run
   schedule:
-    - cron: '0 */12 * * *'
+    - cron: '0 */30 * * *'
 
 jobs:
   build:
