@@ -15,8 +15,9 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Dependencies
-        run: pip install cloudscraper beautifulsoup4 requests
+      - name: Install Critical Libraries
+        # أضفت لك feedparser هنا لأنها سبب الفشل الأكيد
+        run: pip install cloudscraper beautifulsoup4 requests feedparser 
       - name: Run Beast
         run: python the_beast.py
       - name: Commit Changes
