@@ -1,29 +1,31 @@
-name: Pro Link Guard
+name: Auto Update Channels
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '0 0 * * *' # يعمل تلقائياً كل يوم الساعة 12 ليلاً
+  workflow_dispatch: # يسمح لك بتشغيله يدوياً متى شئت
 
 jobs:
-  build:
+  update:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v3
-      - name: Setup Python
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Install Critical Libraries
-        # أضفت لك feedparser هنا لأنها سبب الفشل الأكيد
-        run: pip install cloudscraper beautifulsoup4 requests feedparser 
-      - name: Run Beast
-        run: python the_beast.py
-      - name: Commit Changes
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run script
+        run: python search_channels.py
+
+      - name: Commit changes
         run: |
-          git config --global user.name "Link-Checker-Bot"
-          git config --global user.email "bot@github.com"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
           git add database.csv
-          git commit -m "Auto-fix and update links" || exit 0
+          git commit -m "تحديث تلقائي للقنوات" || exit 0
           git push
