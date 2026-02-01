@@ -1,14 +1,14 @@
 name: Auto Update Channels
 on:
+  workflow_dispatch: # للتشغيل اليدوي من زر Run
   schedule:
     - cron: '0 */12 * * *'
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # ضروري للسماح للبوت بحفظ الملف
+      contents: write
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python
@@ -17,13 +17,13 @@ jobs:
           python-version: '3.9'
       - name: Install requests
         run: pip install requests
-      - name: Run Update
-        # قمت بتغيير الاسم هنا ليتطابق مع ملفك 'the_beast.py'
+      - name: Run The Beast
+        # تأكد أن الاسم هنا مطابق لملفك في GitHub
         run: python the_beast.py 
-      - name: Push back
+      - name: Commit changes
         run: |
           git config --local user.name "GitHub Action"
           git config --local user.email "action@github.com"
           git add database.csv
-          git commit -m "Auto-update database" || exit 0
+          git commit -m "Update links and remove images" || exit 0
           git push
