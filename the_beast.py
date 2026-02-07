@@ -1,77 +1,82 @@
 import requests
+from bs4 import BeautifulSoup
 import csv
-import re
-import cloudscraper
 import os
 
-# مصادر ذهبية متجددة لقنوات beIN و SSC
-SOURCES = [
-    "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ar.m3u",
-    "https://raw.githubusercontent.com/skid96/M3U/main/Sport.m3u",
-    "https://raw.githubusercontent.com/YassinEnnamli/iptv/master/sport.m3u",
-    "https://raw.githubusercontent.com/Moebis/beIN-Sports-IPTV/master/beIN.m3u" # مصدر مخصص لـ beIN
-]
+# إعدادات الموقع والمخرجات
+BASE_URL = "https://mycima.rip"
+DB_FILE = "database.csv"
 
-# كلمات البحث لضمان عدم تفويت أي قناة رياضية عربية
-SPORTS_KEYWORDS = ['beIN', 'SSC', 'KSA', 'رياضة', 'AD Sports', 'Alkass', 'بين سبورت']
-DB_FILE = 'database.csv'
-
-def check_link(url):
-    """فحص سريع وصارم للرابط لضمان الجودة"""
+def get_video_sources(movie_page_url):
+    """استخراج روابط السيرفرات والجودات من صفحة الفيلم"""
+    sources = {"1080p": "", "720p": "", "480p": ""}
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        # نستخدم GET مع timeout قصير جداً لسرعة الفحص
-        with requests.get(url, timeout=4, stream=True, headers=headers) as r:
-            return r.status_code == 200
+        response = requests.get(movie_page_url, headers=headers)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # البحث عن روابط المشاهدة (تعدل حسب هيكل الموقع الحالي)
+        # ملاحظة: MyCima غالباً يستخدم سيرفرات خارجية مثل MyStream أو Upstream
+        watch_servers = soup.select('.WatchServersList li')
+        
+        for server in watch_servers:
+            btn = server.find('btn')
+            if btn:
+                quality = btn.text.strip()
+                link = btn.get('data-url') # الرابط المباشر للمشغل
+                
+                if "1080" in quality: sources["1080p"] = link
+                elif "720" in quality: sources["720p"] = link
+                elif "480" in quality: sources["480p"] = link
+        
+        return sources
     except:
-        return False
+        return sources
 
-def start_process():
-    scraper = cloudscraper.create_scraper()
-    final_list = []
-    seen_urls = set()
-
-    # 1. فحص وتطهير الجدول الحالي
+def update_database():
+    """قراءة الأفلام الجديدة وتحديث قاعدة البيانات مع الحفاظ على القديم"""
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    response = requests.get(BASE_URL, headers=headers)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    
+    # جلب قائمة الأفلام من الصفحة الرئيسية
+    movie_items = soup.select('.GridItem')
+    
+    # قراءة البيانات القديمة لتجنب التكرار
+    existing_movies = {}
     if os.path.exists(DB_FILE):
-        print("🔍 جاري فحص الروابط المخزنة حالياً...")
-        with open(DB_FILE, 'r', encoding='utf-8') as f:
+        with open(DB_FILE, mode='r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                if check_link(row['url']):
-                    final_list.append(row)
-                    seen_urls.add(row['url'])
+                existing_movies[row['Name']] = row
 
-    # 2. الهجوم على المصادر الجديدة
-    print("🚀 جاري سحب روابط beIN Sports الجديدة...")
-    for source in SOURCES:
-        try:
-            response = scraper.get(source, timeout=10)
-            # استخراج الاسم والرابط بدقة
-            matches = re.findall(r'#EXTINF:.*?,(.*?)\n(http.*?)\n', response.text)
-            for name, url in matches:
-                url = url.strip()
-                name = name.strip()
-                
-                # شرط الإضافة: اسم رياضي، ليس توكن، ليس مكرر، وشغال
-                if any(k.lower() in name.lower() for k in SPORTS_KEYWORDS):
-                    if "token" not in url.lower() and url not in seen_urls:
-                        if check_link(url):
-                            final_list.append({'title': name, 'url': url})
-                            seen_urls.add(url)
-                            print(f"➕ مضافة الآن: {name}")
-        except: continue
+    new_data = []
+    for item in movie_items:
+        name = item.find('strong').text.strip()
+        link = item.find('a')['href']
+        
+        # إذا كان الفيلم موجوداً، نفحص صلاحية الرابط، إذا لم يكن موجوداً نسحبه
+        if name not in existing_movies:
+            print(f"جلب فيلم جديد: {name}")
+            sources = get_video_sources(link)
+            new_data.append({
+                "Name": name,
+                "URL_1080": sources["1080p"],
+                "URL_720": sources["720p"],
+                "URL_480": sources["480p"],
+                "Status": "Active"
+            })
+        else:
+            # تحديث الفيلم القديم إذا كان الرابط معطلاً (هنا تضع منطق الفحص)
+            new_data.append(existing_movies[name])
 
-    # 3. ترتيب ذكي: beIN Sports تظهر في القمة دائماً
-    # يتم الترتيب بحيث أي اسم يحتوي على beIN يرتفع للأعلى
-    final_list.sort(key=lambda x: ("BEIN" in x['title'].upper()), reverse=True)
-
-    # 4. حفظ النتيجة النهائية
-    with open(DB_FILE, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=['title', 'url'])
+    # حفظ النتائج في ملف CSV
+    keys = ["Name", "URL_1080", "URL_720", "URL_480", "Status"]
+    with open(DB_FILE, mode='w', encoding='utf-8', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=keys)
         writer.writeheader()
-        writer.writerows(final_list)
-    
-    print(f"✅ اكتمل التحديث! لديك الآن {len(final_list)} قناة رياضية جاهزة.")
+        writer.writerows(new_data)
 
 if __name__ == "__main__":
-    start_process()
+    update_database()
